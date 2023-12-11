@@ -1,0 +1,24 @@
+depth_image_topic: /camera/depth/image_rect_raw
+point_cloud_topic: /camera/depth/color/points
+pose_topic: /mavros/local_position/pose
+odom_topic: /mavros/local_position/odom
+
+# depth_image_topic: /camera/depth/image_rect_raw
+# pose_topic: /mavros/local_position/pose
+# odom_topic: /vins_estimator/imu_propagate
+
+# robot size
+robot_size: [0.4, 0.4, 0.1]
+
+# Camera Parameters
+depth_intrinsics: [387.1536560058594, 387.1536560058594, 321.3246154785156, 233.5471954345703] # fx,  fy, cx, cy
+# depth_intrinsics: [386.22674560546875, 386.22674560546875, 317.3930969238281, 239.78431701660156] # fx,  fy, cx, cy realsense
+depth_scale_factor: 1000 # 1000 for Intel Realsense Camera
+# depth_scale_factor: 10 # 10 for simulator
+image_cols: 640
+image_rows: 480
+body_to_camera: [0.0,  0.0,  1.0,  0.06,
+                -1.0,  0.0,  0.0,  0.02 ,   
+                 0.0, -1.0,  0.0,  0.08,
+                 0.0,  0.0,  0.0,  1.0]
+
