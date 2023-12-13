@@ -17,6 +17,8 @@ robot_size: [0.4, 0.4, 0.1]
 depth_intrinsics: [387.1536560058594, 387.1536560058594, 321.3246154785156, 233.5471954345703] # fx,  fy, cx, cy
 # depth_intrinsics: [386.22674560546875, 386.22674560546875, 317.3930969238281, 239.78431701660156] # fx,  fy, cx, cy realsense
 depth_scale_factor: 1000 # 1000 for Intel Realsense Camera
+depth_min_value: 0.5
+depth_max_value: 5.0
 # depth_scale_factor: 10 # 10 for simulator
 image_cols: 640
 image_rows: 480
