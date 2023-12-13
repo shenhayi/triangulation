@@ -36,15 +36,18 @@ namespace triangulation{
 		// ROS
 		ros::NodeHandle nh_;
 		std::shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depthSub_;
+        std::shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depth_alignedSub_;
 		std::shared_ptr<message_filters::Subscriber<geometry_msgs::PoseStamped>> poseSub_;
+        std::shared_ptr<message_filters::Subscriber<std_msgs::UInt16MultiArray>> semanticMapSub_;
         //TODO: add semantic map subscriber
-		typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped> depthPoseSync;
-		std::shared_ptr<message_filters::Synchronizer<depthPoseSync>> depthPoseSync_;
-		ros::Timer triTimer_;
+		ros::Timer triangulation_Timer_;
         ros::Publisher depthCloudPub_;
+        ros::Publisher depthImagePub_;
 
 		std::string depthTopicName_; // depth image topic
+        std::string depth_alignedTopicName_; // depth aligned image topic
 		std::string poseTopicName_;  // pose topic
+        std::string semanticMapTopicName_; // semantic map topic
 
 		// parameters
 		// -----------------------------------------------------------------
@@ -61,6 +64,7 @@ namespace triangulation{
         // -----------------------------------------------------------------
         // SENSOR DATA //TODO
         cv::Mat depthImage_;
+        cv::Mat depthAlignedImage_;
         pcl::PointCloud<pcl::PointXYZ> pointcloud_;
         Eigen::Vector3d position_; // current position
         Eigen::Matrix3d orientation_; // current orientation
@@ -84,7 +88,9 @@ namespace triangulation{
         Eigen::Vector3d currMapRangeMax_ = Eigen::Vector3d (0, 0, 0);
         bool useFreeRegions_ = false;
 
-
+        //Segmentation
+        std::vector<std::vector<Eigen::Vector3d>> segments_;
+        std::vector<cv::Mat> mask_;
 
 		public:
 		triangulator();
@@ -96,13 +102,18 @@ namespace triangulation{
 		void registerPub();
         void registerSub();
 
-		void depthPoseCB(const sensor_msgs::ImageConstPtr& img, const geometry_msgs::PoseStampedConstPtr& pose);
-		void depthOdomCB(const sensor_msgs::ImageConstPtr& img, const nav_msgs::OdometryConstPtr& odom);
         void triangulationCB(const ros::TimerEvent& event);
 
+        void depthImageCB(const sensor_msgs::ImageConstPtr& depthImageMsg);
+        void depthAlignedImageCB(const sensor_msgs::ImageConstPtr& depthAlignedImageMsg);
+        void poseCB(const geometry_msgs::PoseStampedConstPtr& poseMsg);
+        void semanticMapCB(const std_msgs::UInt16MultiArrayConstPtr& semanticMapMsg);
+
+        void getMask(int height, int width, int channel);
 		void projectDepthImage();// project depth image to point cloud
 
         void getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix);
+        void publishDepthImage();// publish depth image
         void publishProjPoints();// publish depth cloud
     };
     inline void triangulator::getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix){

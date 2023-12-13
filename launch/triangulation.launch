@@ -1,4 +1,4 @@
 <launch>
 	<rosparam file="$(find triangulation)/cfg/triangulation.yaml" ns="/triangulation"  />
-	<node pkg="triangulation" type="triangulation" name="triangulation" output="screen" />
+	<node pkg="triangulation" type="triangulation_node" name="triangulation" output="screen" />
 </launch>
