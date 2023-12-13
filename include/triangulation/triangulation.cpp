@@ -192,6 +192,15 @@ namespace triangulation{
             for (int u=0; u<this->depthImage_.cols; ++u){
                 depth = static_cast<double>(this->depthImage_.at<ushort>(v, u)) * inv_factor;
                 if (depth > 0.0){
+                    bool detect = false;
+                    int label = 0;
+                    for(int i=1;i<channel;i++){
+                        if(this->mask_[i].at<ushort>(v,u) != 0){
+                            detect = true;
+                            label = this->mask_[i].at<ushort>(v,u);
+                            break;
+                        }
+                    }
                     currPointCam(0) = (u - this->cx_) * depth * inv_fx;
                     currPointCam(1) = (v - this->cy_) * depth * inv_fy;
                     currPointCam(2) = depth;
