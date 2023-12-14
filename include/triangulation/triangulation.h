@@ -25,6 +25,7 @@
 #include <std_msgs/UInt16MultiArray.h>
 #include <visualization_msgs/MarkerArray.h>
 #include<geometry_msgs/PoseStamped.h>
+#include <algorithm>
 
 #include<triangulation/utils.h>
 
@@ -65,6 +66,7 @@ namespace triangulation{
         double depthMinValue_, depthMaxValue_;
 		int imgCols_, imgRows_;
 		Eigen::Matrix4d body2Cam_; // from body frame to camera frame
+        Eigen::Matrix4d camPoseMatrix_;
 
         // data
         // -----------------------------------------------------------------
@@ -127,6 +129,7 @@ namespace triangulation{
         
         void projectObject();
         void publishBoundingBox(); 
+        void Cam2Map(Eigen::Vector3d &position);
     };
     inline void triangulator::getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix){
         Eigen::Quaterniond quat;
@@ -143,6 +146,8 @@ namespace triangulation{
 
         camPoseMatrix = map2body * this->body2Cam_;
     }
+    
 }
+
 
 #endif
