@@ -245,22 +245,38 @@ namespace triangulation{
 
     void triangulator::publishProjPoints(){
         pcl::PointXYZ pt;
-        pcl::PointCloud<pcl::PointXYZ> cloud;
+        // pcl::PointCloud<pcl::PointXYZ> cloud;
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+        // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
+
+
 
         for (int i=0; i<this->projPointsNum_; ++i){
             pt.x = this->projPoints_[i](0);
             pt.y = this->projPoints_[i](1);
             pt.z = this->projPoints_[i](2);
-            cloud.push_back(pt);
+            cloud->push_back(pt);
         }
 
-        cloud.width = cloud.points.size();
-        cloud.height = 1;
-        cloud.is_dense = true;
-        cloud.header.frame_id = "map";
+       
+
+        // pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+        // sor.setInputCloud(cloud);
+        // sor.setMeanK(10);
+        // sor.setStddevMulThresh(1.0);
+        // sor.filter (*cloud_filtered); 
+        
+        // cloud_filtered->width = cloud_filtered->points.size();
+        // cloud_filtered->height = 1;
+        // cloud_filtered->is_dense = true;
+        // cloud_filtered->header.frame_id = "map";
+        cloud->width = cloud->points.size();
+        cloud->height = 1;
+        cloud->is_dense = true;
+        cloud->header.frame_id = "map";
 
         sensor_msgs::PointCloud2 cloudMsg;
-        pcl::toROSMsg(cloud, cloudMsg);
+        pcl::toROSMsg(*cloud, cloudMsg);
         this->depthCloudPub_.publish(cloudMsg);
     }
 
@@ -324,7 +340,7 @@ namespace triangulation{
         this->projectDepthImage();
         this->projectObject();
         // publish depth image
-        this->publishDepthImage();
+        // this->publishDepthImage();
         this->publishBoundingBox();
     }
 
@@ -351,17 +367,23 @@ namespace triangulation{
         int num_mask = this->semanticMap_.data.size()/height/width;
 
         for (int i=1;i<num_mask;++i){
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
+
             ObjectPointX.clear();
             ObjectPointY.clear();
             ObjectPointZ.clear();
             int object_idx;
-
-            for (int v=0; v<this->depthImage_.rows; ++v){
-                for (int u=0; u<this->depthImage_.cols; ++u){
+            int pointcounter = 0;
+            for (int v=1; v<this->depthImage_.rows; ++v){
+                for (int u=1; u<this->depthImage_.cols; ++u){
 
                     depth = static_cast<double>(this->depthImage_.at<ushort>(v, u)) * inv_factor;
                     if (depth > 0.0){
                         if (this->mask_[i].at<ushort>(v,u) != 0){
+                        // && this->mask_[i].at<ushort>(v+1,u) != 0 && this->mask_[i].at<ushort>(v-1,u) != 0 
+                        // && this->mask_[i].at<ushort>(v+1,u+1) != 0 && this->mask_[i].at<ushort>(v+1,u) != 0 && this->mask_[i].at<ushort>(v+1,u-1) != 0 
+                        // && this->mask_[i].at<ushort>(v-1,u-1) != 0 && this->mask_[i].at<ushort>(v-1,u) != 0 && this->mask_[i].at<ushort>(v-1,u+1) != 0){
                         object_idx = this->mask_[i].at<ushort>(v,u);
                         currPointCam(0) = (u - this->cx_) * depth * inv_fx;
                         currPointCam(1) = (v - this->cy_) * depth * inv_fy;
@@ -372,14 +394,45 @@ namespace triangulation{
                         // ObjectPointY.push_back(currPointMap(1));
                         // ObjectPointZ.push_back(currPointMap(2));
                         
-                        ObjectPointX.push_back(currPointCam(0));
-                        ObjectPointY.push_back(currPointCam(1));
-                        ObjectPointZ.push_back(currPointCam(2));
+                        // ObjectPointX.push_back(currPointCam(0));
+                        // ObjectPointY.push_back(currPointCam(1));
+                        // ObjectPointZ.push_back(currPointCam(2));
+                        pcl::PointXYZ pt;
+                        pt.x = currPointCam(0);
+                        pt.y = currPointCam(1);
+                        pt.z = currPointCam(2);
+                        cloud->push_back(pt);
+                        pointcounter++;
 
                         }
                     }
                 }
             }
+
+            if (pointcounter != 0){
+                pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+                sor.setInputCloud(cloud);
+                sor.setMeanK(50);
+                sor.setStddevMulThresh(0.2);
+                sor.filter (*cloud_filtered);
+
+                // cloud_filtered->width = cloud_filtered->points.size();
+                // cloud_filtered->height = 1;
+                // cloud_filtered->is_dense = true;
+                // cloud_filtered->header.frame_id = "map";
+
+                for (int i=0;i<cloud_filtered->points.size(); ++i){
+                    pcl::PointXYZ pt;
+                    pt = cloud_filtered->points[i];
+                    ObjectPointX.push_back(pt.x);
+                    ObjectPointY.push_back(pt.y);
+                    ObjectPointZ.push_back(pt.z);
+                }
+            }
+
+
+
+
 
             if (ObjectPointX.size()!=0 && ObjectPointY.size()!=0 && ObjectPointZ.size()!=0){
                 vertex v;
