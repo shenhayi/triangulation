@@ -17,6 +17,7 @@ namespace triangulation{
         this->ns_ = "triangulation";
         this->hint_ = "[TRIANGULATION] ";
         this->initParam();
+        this->initLabelMap();
         this->registerPub();
         this->registerSub();
     }
@@ -25,6 +26,7 @@ namespace triangulation{
         // initialize triangulator
         this->nh_ = nh;
         this->initParam();
+        this->initLabelMap();
         this->registerPub();
         this->registerSub();
     }
@@ -64,6 +66,15 @@ namespace triangulation{
         }
         else{
             cout << this->hint_ << ": Semantic map topic: " << this->semanticMapTopicName_ << endl;
+        }
+
+        // class_labels_path
+        if(not this->nh_.getParam(this->ns_ + "/class_labels_path", this->class_labels_path_)){
+            this->class_labels_path_ = "/home/anthonyshen/ws/src/CERLAB-Autonomy/triangulation/class_labels/coco.txt";
+            cout << this->hint_ << ": No class labels path. Use default: /home/anthonyshen/ws/src/CERLAB-Autonomy/triangulation/class_labels/coco.txt" << endl;
+        }
+        else{
+            cout << this->hint_ << ": Class labels path: " << this->class_labels_path_ << endl;
         }
 
         std::vector<double> robotSizeVec (3);
@@ -181,7 +192,6 @@ namespace triangulation{
                 }
             }
         }
-
     }
 
     void triangulator::projectDepthImage(){//TODO: (image size: height: 480; width:640) convert the 1-D array back to the original depth image
@@ -212,11 +222,9 @@ namespace triangulation{
                 depth = static_cast<double>(this->depthImage_.at<ushort>(v, u)) * inv_factor;
                 if (depth > 0.0){
                     bool detect = false;
-                    int label = 0;
                     for(int i=1;i<channel;i++){
                         if(this->mask_[i].at<ushort>(v,u) != 0){
                             detect = true;
-                            label = this->mask_[i].at<ushort>(v,u);
                             break;
                         }
                     }
@@ -225,14 +233,11 @@ namespace triangulation{
                         currPointCam(1) = (v - this->cy_) * depth * inv_fy;
                         currPointCam(2) = depth;                        
 			    
-		    currPointMap =
-			this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
+//                        currPointMap =
+//                        this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
 
-                        // currPointMap =
-                        //         this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
-
-
-                                
+                         currPointMap =
+                                 this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
 
                         this->projPoints_.push_back(currPointMap);
                         this->projPointsNum_++;
@@ -244,6 +249,54 @@ namespace triangulation{
         // publish point cloud
         this->publishProjPoints();
     }
+
+    void triangulator::getLabels() {
+        this->labels_.clear();
+        for(int k=1;k<this->mask_.size();k++){
+            bool found = false;
+            for(int i=0;i<this->mask_[k].rows;i++){
+                for(int j=0;j<this->mask_[k].cols;j++){
+                    if(this->mask_[k].at<ushort>(i,j) != 0){
+                        this->labels_.push_back(this->mask_[k].at<ushort>(i,j));
+                        found = true;
+                        break;
+                    }
+                }
+                if(found) break;
+            }
+        }
+//        for(int i=0;i<this->labels_.size();i++){
+//            std::cout << this->labels_[i] << " ";
+//        }
+    }
+
+    void triangulator::initLabelMap() {
+        std::ifstream file(this->class_labels_path_);
+        if (file.is_open()) {
+            std::string line;
+            while (std::getline(file, line)) {
+                this->label2name_.push_back(line);
+            }
+            file.close();
+        }
+    }
+
+    void triangulator::label2name() {
+        this->classNames_.clear();
+        for(int i=0;i<this->labels_.size();i++){
+            int label = this->labels_[i];
+            if(label < this->label2name_.size()) {
+                this->classNames_.push_back(this->label2name_[label]);
+            } else {
+                this->classNames_.push_back("Unknown");
+            }
+        }
+//        for(int i=0;i<this->classNames_.size();i++){
+//            std::cout << this->classNames_[i] << " ";
+//        }
+    }
+
+
 
     void triangulator::publishProjPoints(){
         pcl::PointXYZ pt;
@@ -340,6 +393,8 @@ namespace triangulation{
     void triangulator::triangulationCB(const ros::TimerEvent& event){
         // project depth image to point cloud
         this->projectDepthImage();
+        this->getLabels();
+        this->label2name();
         this->projectObject();
         // publish depth image
         // this->publishDepthImage();
@@ -448,9 +503,7 @@ namespace triangulation{
                 // cout<<"-----------object detected--------------------"<<endl;
                 boundingboxes.push_back(v);
             }
-            
         }
-
     }
 
 
@@ -470,6 +523,18 @@ namespace triangulation{
             line.color.a = 1.0;
             line.lifetime = ros::Duration(0.1);
             Eigen::Vector3d vertex_pose;
+            //add label
+            visualization_msgs::Marker text;
+            text.header.frame_id = "map";
+            text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+            text.action = visualization_msgs::Marker::ADD;
+            Eigen::Vector3d vertex_pose_text;
+            text.ns = "label";
+            text.scale.z = 0.5;
+            text.color.r = 0;
+            text.color.g = 0;
+            text.color.b = 0.8;
+            text.color.a = 1.0;
 
 
             for(size_t i = 0; i < boundingboxes.size(); i++){
@@ -553,10 +618,20 @@ namespace triangulation{
                 for (size_t i=0;i<12;i++){
                         line.points.push_back(verts[vert_idx[i][0]]);
                         line.points.push_back(verts[vert_idx[i][1]]);
-                    }
+                }
                     
-                    lines.markers.push_back(line);
-                    line.id++;
+                lines.markers.push_back(line);
+                line.id++;
+
+                //add label
+                text.id = i;
+                text.text = std::to_string(this->labels_[i]) + ":" + this->classNames_[i];
+                vertex_pose_text(0) = v.xmax; vertex_pose_text(1) = v.ymin; vertex_pose_text(2) = v.zmin;
+                Cam2Map(vertex_pose_text);
+                text.pose.position.x = vertex_pose_text(0);
+                text.pose.position.y = vertex_pose_text(1);
+                text.pose.position.z = vertex_pose_text(2);
+                lines.markers.push_back(text);
             }
             this->boundingBoxPub_.publish(lines);
         }
