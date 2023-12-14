@@ -225,11 +225,11 @@ namespace triangulation{
                         currPointCam(1) = (v - this->cy_) * depth * inv_fy;
                         currPointCam(2) = depth;
 
-                        currPointMap =
-                                this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
-
                         // currPointMap =
-                        // this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
+                        //         this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
+
+                        currPointMap =
+                        this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
                                 
 
                         this->projPoints_.push_back(currPointMap);
