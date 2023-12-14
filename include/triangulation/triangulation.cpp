@@ -17,6 +17,7 @@ namespace triangulation{
         this->ns_ = "triangulation";
         this->hint_ = "[TRIANGULATION] ";
         this->initParam();
+        this->initLabelMap();
         this->registerPub();
         this->registerSub();
     }
@@ -25,6 +26,7 @@ namespace triangulation{
         // initialize triangulator
         this->nh_ = nh;
         this->initParam();
+        this->initLabelMap();
         this->registerPub();
         this->registerSub();
     }
@@ -268,21 +270,23 @@ namespace triangulation{
 //        }
     }
 
-    void triangulator::label2name() {
-        std::vector<std::string> label_to_name;
+    void triangulator::initLabelMap() {
         std::ifstream file(this->class_labels_path_);
         if (file.is_open()) {
             std::string line;
             while (std::getline(file, line)) {
-                label_to_name.push_back(line);
+                this->label2name_.push_back(line);
             }
             file.close();
         }
+    }
+
+    void triangulator::label2name() {
         this->classNames_.clear();
         for(int i=0;i<this->labels_.size();i++){
             int label = this->labels_[i];
-            if(label < label_to_name.size()) {
-                this->classNames_.push_back(label_to_name[label]);
+            if(label < this->label2name_.size()) {
+                this->classNames_.push_back(this->label2name_[label]);
             } else {
                 this->classNames_.push_back("Unknown");
             }
