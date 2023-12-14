@@ -26,7 +26,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include<geometry_msgs/PoseStamped.h>
 #include <algorithm>
-
+#include <pcl/filters/statistical_outlier_removal.h>
 #include<triangulation/utils.h>
 
 using std::cout; using std::endl;
