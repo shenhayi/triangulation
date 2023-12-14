@@ -25,7 +25,6 @@
 #include <std_msgs/UInt16MultiArray.h>
 #include <visualization_msgs/MarkerArray.h>
 #include<geometry_msgs/PoseStamped.h>
-#include <iterator>
 
 #include<triangulation/utils.h>
 
