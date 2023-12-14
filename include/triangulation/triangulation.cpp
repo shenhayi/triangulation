@@ -66,6 +66,15 @@ namespace triangulation{
             cout << this->hint_ << ": Semantic map topic: " << this->semanticMapTopicName_ << endl;
         }
 
+        // class_labels_path
+        if(not this->nh_.getParam(this->ns_ + "/class_labels_path", this->class_labels_path_)){
+            this->class_labels_path_ = "/home/anthonyshen/ws/src/CERLAB-Autonomy/triangulation/class_labels/coco.txt";
+            cout << this->hint_ << ": No class labels path. Use default: /home/anthonyshen/ws/src/CERLAB-Autonomy/triangulation/class_labels/coco.txt" << endl;
+        }
+        else{
+            cout << this->hint_ << ": Class labels path: " << this->class_labels_path_ << endl;
+        }
+
         std::vector<double> robotSizeVec (3);
         if (not this->nh_.getParam(this->ns_ + "/robot_size", robotSizeVec)){
             robotSizeVec = std::vector<double>{0.5, 0.5, 0.3};
@@ -254,10 +263,35 @@ namespace triangulation{
                 if(found) break;
             }
         }
-        for(int i=0;i<this->labels_.size();i++){
-            std::cout << this->labels_[i] << " ";
-        }
+//        for(int i=0;i<this->labels_.size();i++){
+//            std::cout << this->labels_[i] << " ";
+//        }
     }
+
+    void triangulator::label2name() {
+        std::vector<std::string> label_to_name;
+        std::ifstream file(this->class_labels_path_);
+        if (file.is_open()) {
+            std::string line;
+            while (std::getline(file, line)) {
+                label_to_name.push_back(line);
+            }
+            file.close();
+        }
+        this->classNames_.clear();
+        for(int i=0;i<this->labels_.size();i++){
+            int label = this->labels_[i];
+            if(label < label_to_name.size()) {
+                this->classNames_.push_back(label_to_name[label]);
+            } else {
+                this->classNames_.push_back("Unknown");
+            }
+        }
+//        for(int i=0;i<this->classNames_.size();i++){
+//            std::cout << this->classNames_[i] << " ";
+//        }
+    }
+
 
 
     void triangulator::publishProjPoints(){
@@ -340,6 +374,7 @@ namespace triangulation{
         // project depth image to point cloud
         this->projectDepthImage();
         this->getLabels();
+        this->label2name();
         this->projectObject();
         // publish depth image
         this->publishDepthImage();
@@ -411,9 +446,7 @@ namespace triangulation{
                 // cout<<"-----------object detected--------------------"<<endl;
                 boundingboxes.push_back(v);
             }
-            
         }
-
     }
 
 
@@ -535,7 +568,7 @@ namespace triangulation{
 
                 //add label
                 text.id = i;
-                text.text = std::to_string(this->labels_[i]);
+                text.text = std::to_string(this->labels_[i]) + ":" + this->classNames_[i];
                 vertex_pose_text(0) = v.xmax; vertex_pose_text(1) = v.ymin; vertex_pose_text(2) = v.zmin;
                 Cam2Map(vertex_pose_text);
                 text.pose.position.x = vertex_pose_text(0);
