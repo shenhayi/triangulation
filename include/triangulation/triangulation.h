@@ -25,6 +25,7 @@
 #include <std_msgs/UInt16MultiArray.h>
 #include <visualization_msgs/MarkerArray.h>
 #include<geometry_msgs/PoseStamped.h>
+#include <iterator>
 
 #include<triangulation/utils.h>
 
@@ -124,7 +125,7 @@ namespace triangulation{
         void publishDepthImage();// publish depth image
         void publishProjPoints();// publish depth cloud
         
-        void getBoundary();
+        void projectObject();
         void publishBoundingBox(); 
     };
     inline void triangulator::getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix){

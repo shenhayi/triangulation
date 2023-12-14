@@ -286,8 +286,10 @@ namespace triangulation{
     void triangulator::triangulationCB(const ros::TimerEvent& event){
         // project depth image to point cloud
         this->projectDepthImage();
+        this->projectObject();
         // publish depth image
         this->publishDepthImage();
+        this->publishBoundingBox();
     }
 
     void triangulator::registerSub(){
@@ -295,94 +297,132 @@ namespace triangulation{
         this->registerCallback();
     }
 
-    void triangulator::getBoundary(){
-        // find vertex: 
+    void triangulator::projectObject(){      
+        
         this->boundingboxes.clear();
-        //change num_mask into num_mask param
-        int num_mask = this->semanticMap_.data.size()/height/width-1;
-        for (int i=1; i<num_mask; i++){
-        vertex v;
-        // v.xmax = 
-        // v.ymax = 
-        // v.zmax = 
-        // v.xmin = 
-        // v.ymin =
-        // v.zmin = 
+        Eigen::Vector3d currPointCam, currPointMap;
+        std::vector<double> ObjectPointX;
+        std::vector<double> ObjectPointY;
+        std::vector<double> ObjectPointZ;
 
-        // for (int i=0; i<this->projPointsNum_; ++i){
-        //     x_ = this->projPoints_[i](0);
-        //     y = this->projPoints_[i](1);
-        //     z = this->projPoints_[i](2);
-        // }
+        double depth;
+        double object_idx;
+        const double inv_factor = 1.0 / this->depthScale_;
+        const double inv_fx = 1.0 / this->fx_;
+        const double inv_fy = 1.0 / this->fy_;
 
-        boundingboxes.push_back(v);
+        int height = 480;
+        int width = 640;
+        int num_mask = this->semanticMap_.data.size()/height/width;
+
+        for (int i=1;i<num_mask;++i){
+            ObjectPointX.clear();
+            ObjectPointY.clear();
+            ObjectPointZ.clear();
+  
+
+            for (int v=0; v<this->depthImage_.rows; ++v){
+                for (int u=0; u<this->depthImage_.cols; ++u){
+
+                    depth = static_cast<double>(this->depthImage_.at<ushort>(v, u)) * inv_factor;
+                    object_idx = this->mask_[i].at<ushort>(v,u);
+                    if (depth > 0.0){
+                        if (object_idx != 0){
+                        currPointCam(0) = (u - this->cx_) * depth * inv_fx;
+                        currPointCam(1) = (v - this->cy_) * depth * inv_fy;
+                        currPointCam(2) = depth;
+
+                        currPointMap = this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
+
+                        ObjectPointX.push_back(currPointMap(0));
+                        ObjectPointY.push_back(currPointMap(1));
+                        ObjectPointZ.push_back(currPointMap(2));
+
+                        }
+                    }
+                }
+            }
+
+            vertex v;
+            v.xmax = *max_element(ObjectPointX.begin(), ObjectPointX.end());
+            v.xmin = *min_element(ObjectPointX.begin(), ObjectPointX.end());
+            v.ymax = *max_element(ObjectPointY.begin(), ObjectPointY.end());
+            v.ymin = *min_element(ObjectPointY.begin(), ObjectPointY.end());
+            v.zmax = *max_element(ObjectPointZ.begin(), ObjectPointZ.end());
+            v.zmin = *min_element(ObjectPointZ.begin(), ObjectPointZ.end());
+            // cout<<"-----------object detected--------------------"<<endl;
+            boundingboxes.push_back(v);
         }
 
     }
+
 
     void triangulator::publishBoundingBox(){
 
-        visualization_msgs::Marker line;
-        visualization_msgs::MarkerArray lines;
-        line.header.frame_id = "map";
-        line.type = visualization_msgs::Marker::LINE_LIST;
-        line.action = visualization_msgs::Marker::ADD;
-        line.ns = "box3D";  
-        line.scale.x = 0.06;
-        line.color.r = 1;
-        line.color.g = 0;
-        line.color.b = 0;
-        line.color.a = 1.0;
-        line.lifetime = ros::Duration(0.1);
+        if (this->boundingboxes.size()!=0){
+            visualization_msgs::Marker line;
+            visualization_msgs::MarkerArray lines;
+            line.header.frame_id = "map";
+            line.type = visualization_msgs::Marker::LINE_LIST;
+            line.action = visualization_msgs::Marker::ADD;
+            line.ns = "box3D";  
+            line.scale.x = 0.06;
+            line.color.r = 1;
+            line.color.g = 0;
+            line.color.b = 0;
+            line.color.a = 1.0;
+            line.lifetime = ros::Duration(0.1);
 
-        // change num_mask into variable that represent num_mask
-        int num_mask = 1;
-        for(size_t i = 0; i < num_mask; i++){
-        vertex v = this->boundingboxes[i];
-         std::vector<geometry_msgs::Point> verts;
-         verts.clear();
-	     geometry_msgs::Point p;
-         p.x = v.xmax; p.y = v.ymax; p.z = v.zmax;
-         verts.push_back(p);
-         p.x = v.xmin; p.y = v.ymax; p.z = v.zmax;
-         verts.push_back(p);
-         p.x = v.xmin; p.y = v.ymin; p.z = v.zmax;
-         verts.push_back(p);
-         p.x = v.xmax; p.y = v.ymin; p.z = v.zmax;
-         verts.push_back(p);
-         p.x = v.xmax; p.y = v.ymax; p.z = v.zmin;
-         verts.push_back(p);
-         p.x = v.xmin; p.y = v.ymax; p.z = v.zmin;
-         verts.push_back(p);
-         p.x = v.xmin; p.y = v.ymin; p.z = v.zmin;
-         verts.push_back(p);
-         p.x = v.xmax; p.y = v.ymin; p.z = v.zmin;
-         verts.push_back(p);
 
-        int vert_idx[12][2] = {
-            {0,1},
-            {1,2},
-            {2,3},
-            {0,3},
-            {0,4},
-            {1,5},
-            {3,7},
-            {2,6},
-            {4,5},
-            {5,6},
-            {4,7},
-            {6,7}
-        };
 
-        for (size_t i=0;i<12;i++){
-                line.points.push_back(verts[vert_idx[i][0]]);
-                line.points.push_back(verts[vert_idx[i][1]]);
+            for(size_t i = 0; i < boundingboxes.size(); i++){
+                vertex v = this->boundingboxes[i];
+                std::vector<geometry_msgs::Point> verts;
+                verts.clear();
+                geometry_msgs::Point p;
+                p.x = v.xmax; p.y = v.ymax; p.z = v.zmax;
+                verts.push_back(p);
+                p.x = v.xmin; p.y = v.ymax; p.z = v.zmax;
+                verts.push_back(p);
+                p.x = v.xmin; p.y = v.ymin; p.z = v.zmax;
+                verts.push_back(p);
+                p.x = v.xmax; p.y = v.ymin; p.z = v.zmax;
+                verts.push_back(p);
+                p.x = v.xmax; p.y = v.ymax; p.z = v.zmin;
+                verts.push_back(p);
+                p.x = v.xmin; p.y = v.ymax; p.z = v.zmin;
+                verts.push_back(p);
+                p.x = v.xmin; p.y = v.ymin; p.z = v.zmin;
+                verts.push_back(p);
+                p.x = v.xmax; p.y = v.ymin; p.z = v.zmin;
+                verts.push_back(p);
+
+                int vert_idx[12][2] = {
+                    {0,1},
+                    {1,2},
+                    {2,3},
+                    {0,3},
+                    {0,4},
+                    {1,5},
+                    {3,7},
+                    {2,6},
+                    {4,5},
+                    {5,6},
+                    {4,7},
+                    {6,7}
+                };
+
+                for (size_t i=0;i<12;i++){
+                        line.points.push_back(verts[vert_idx[i][0]]);
+                        line.points.push_back(verts[vert_idx[i][1]]);
+                    }
+                    
+                    lines.markers.push_back(line);
+                    line.id++;
             }
-            
-            lines.markers.push_back(line);
-            line.id++;
+            this->boundingBoxPub_.publish(lines);
         }
-        this->boundingBoxPub_.publish(lines);
     }
+
 }
 
