@@ -392,10 +392,11 @@ namespace triangulation{
 
     void triangulator::triangulationCB(const ros::TimerEvent& event){
         // project depth image to point cloud
-        this->projectDepthImage();
+        // this->projectDepthImage();
+        this->projectObject();
         this->getLabels();
         this->label2name();
-        this->projectObject();
+        
         // publish depth image
         // this->publishDepthImage();
         this->publishBoundingBox();
@@ -407,6 +408,21 @@ namespace triangulation{
     }
 
     void triangulator::projectObject(){  
+        int height = 480;
+        int width = 640;
+        int channel = this->semanticMap_.data.size()/height/width;
+        // get mask
+        this->getMask(height, width, channel);
+        // get depth image from the first channel of mask
+        if(!mask_.empty()){
+            this->depthImage_ = mask_[0].clone();
+        }else{
+            std::cout << "Mask is empty, can't get depth image" << std::endl;
+            this->depthImage_ = cv::Mat(480, 640, CV_16UC1, cv::Scalar(0));
+        }
+        // project depth image to point cloud
+        this->projPoints_.clear();
+        this->projPointsNum_ = 0;
         this->boundingboxes.clear();
         Eigen::Vector3d currPointCam, currPointMap;
         std::vector<double> ObjectPointX;
@@ -419,11 +435,7 @@ namespace triangulation{
         const double inv_fx = 1.0 / this->fx_;
         const double inv_fy = 1.0 / this->fy_;
 
-        int height = 480;
-        int width = 640;
-        int num_mask = this->semanticMap_.data.size()/height/width;
-
-        for (int i=1;i<num_mask;++i){
+        for (int i=1;i<channel;++i){
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
 
@@ -446,7 +458,7 @@ namespace triangulation{
                         currPointCam(1) = (v - this->cy_) * depth * inv_fy;
                         currPointCam(2) = depth;
 
-                        // currPointMap = this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
+                        currPointMap = this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
                         // ObjectPointX.push_back(currPointMap(0));
                         // ObjectPointY.push_back(currPointMap(1));
                         // ObjectPointZ.push_back(currPointMap(2));
@@ -459,6 +471,9 @@ namespace triangulation{
                         pt.y = currPointCam(1);
                         pt.z = currPointCam(2);
                         cloud->push_back(pt);
+
+                        this->projPoints_.push_back(currPointMap);
+                        this->projPointsNum_++;
                         pointcounter++;
 
                         }
@@ -487,10 +502,6 @@ namespace triangulation{
                 }
             }
 
-
-
-
-
             if (ObjectPointX.size()!=0 && ObjectPointY.size()!=0 && ObjectPointZ.size()!=0){
                 vertex v;
                 v.xmax = *max_element(ObjectPointX.begin(), ObjectPointX.end());
@@ -504,6 +515,7 @@ namespace triangulation{
                 boundingboxes.push_back(v);
             }
         }
+        this->publishProjPoints();
     }
 
 
