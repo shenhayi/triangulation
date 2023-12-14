@@ -99,6 +99,7 @@ namespace triangulation{
         //Segmentation
         std::vector<std::vector<Eigen::Vector3d>> segments_;
         std::vector<cv::Mat> mask_;
+        std::vector<int> labels_;
 
         //Bounding box
         std::vector<vertex> boundingboxes;
@@ -121,6 +122,7 @@ namespace triangulation{
         void semanticMapCB(const std_msgs::UInt16MultiArrayConstPtr& semanticMapMsg);
 
         void getMask(int height, int width, int channel);
+        void getLabels();
 		void projectDepthImage();// project depth image to point cloud
 
         void getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix);
