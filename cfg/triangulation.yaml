@@ -1,7 +1,7 @@
 depth_image_topic: /camera/depth/image_rect_raw
 point_cloud_topic: /camera/depth/color/points
 depth_aligned_topic: /camera/aligned_depth_to_color/image_raw_t
-pose_topic: /mavros/local_position/pose
+pose_topic: /yolov7/yolov7/robot/pose
 odom_topic: /mavros/local_position/odom
 seg_topic: /yolov7/yolov7_mask
 

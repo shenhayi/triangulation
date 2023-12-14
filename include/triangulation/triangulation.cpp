@@ -139,6 +139,7 @@ namespace triangulation{
         // depth image publisher
         this->depthImagePub_ = this->nh_.advertise<sensor_msgs::Image>(this->ns_ + "/depth_image", 10);
         this->depthCloudPub_ = this->nh_.advertise<sensor_msgs::PointCloud2>(this->ns_ + "/depth_cloud", 10);
+        this->boundingBoxPub_ = this->nh_.advertise<visualization_msgs::MarkerArray>(this->ns_ + "/bounding_box", 1000);
     }
 
     void triangulator::getMask(int height, int width, int channel) {
@@ -293,4 +294,95 @@ namespace triangulation{
         // register subscribers
         this->registerCallback();
     }
+
+    void triangulator::getBoundary(){
+        // find vertex: 
+        this->boundingboxes.clear();
+        //change num_mask into num_mask param
+        int num_mask = this->semanticMap_.data.size()/height/width-1;
+        for (int i=1; i<num_mask; i++){
+        vertex v;
+        // v.xmax = 
+        // v.ymax = 
+        // v.zmax = 
+        // v.xmin = 
+        // v.ymin =
+        // v.zmin = 
+
+        // for (int i=0; i<this->projPointsNum_; ++i){
+        //     x_ = this->projPoints_[i](0);
+        //     y = this->projPoints_[i](1);
+        //     z = this->projPoints_[i](2);
+        // }
+
+        boundingboxes.push_back(v);
+        }
+
+    }
+
+    void triangulator::publishBoundingBox(){
+
+        visualization_msgs::Marker line;
+        visualization_msgs::MarkerArray lines;
+        line.header.frame_id = "map";
+        line.type = visualization_msgs::Marker::LINE_LIST;
+        line.action = visualization_msgs::Marker::ADD;
+        line.ns = "box3D";  
+        line.scale.x = 0.06;
+        line.color.r = 1;
+        line.color.g = 0;
+        line.color.b = 0;
+        line.color.a = 1.0;
+        line.lifetime = ros::Duration(0.1);
+
+        // change num_mask into variable that represent num_mask
+        int num_mask = 1;
+        for(size_t i = 0; i < num_mask; i++){
+        vertex v = this->boundingboxes[i];
+         std::vector<geometry_msgs::Point> verts;
+         verts.clear();
+	     geometry_msgs::Point p;
+         p.x = v.xmax; p.y = v.ymax; p.z = v.zmax;
+         verts.push_back(p);
+         p.x = v.xmin; p.y = v.ymax; p.z = v.zmax;
+         verts.push_back(p);
+         p.x = v.xmin; p.y = v.ymin; p.z = v.zmax;
+         verts.push_back(p);
+         p.x = v.xmax; p.y = v.ymin; p.z = v.zmax;
+         verts.push_back(p);
+         p.x = v.xmax; p.y = v.ymax; p.z = v.zmin;
+         verts.push_back(p);
+         p.x = v.xmin; p.y = v.ymax; p.z = v.zmin;
+         verts.push_back(p);
+         p.x = v.xmin; p.y = v.ymin; p.z = v.zmin;
+         verts.push_back(p);
+         p.x = v.xmax; p.y = v.ymin; p.z = v.zmin;
+         verts.push_back(p);
+
+        int vert_idx[12][2] = {
+            {0,1},
+            {1,2},
+            {2,3},
+            {0,3},
+            {0,4},
+            {1,5},
+            {3,7},
+            {2,6},
+            {4,5},
+            {5,6},
+            {4,7},
+            {6,7}
+        };
+
+        for (size_t i=0;i<12;i++){
+                line.points.push_back(verts[vert_idx[i][0]]);
+                line.points.push_back(verts[vert_idx[i][1]]);
+            }
+            
+            lines.markers.push_back(line);
+            line.id++;
+        }
+        this->boundingBoxPub_.publish(lines);
+    }
 }
+
