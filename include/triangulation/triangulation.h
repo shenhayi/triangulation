@@ -23,6 +23,11 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <thread>
 #include <std_msgs/UInt16MultiArray.h>
+#include <visualization_msgs/MarkerArray.h>
+#include<geometry_msgs/PoseStamped.h>
+#include <algorithm>
+
+#include<triangulation/utils.h>
 
 using std::cout; using std::endl;
 namespace triangulation{
@@ -43,6 +48,7 @@ namespace triangulation{
 		ros::Timer triangulation_Timer_;
         ros::Publisher depthCloudPub_;
         ros::Publisher depthImagePub_;
+        ros::Publisher boundingBoxPub_;
 
 		std::string depthTopicName_; // depth image topic
         std::string depth_alignedTopicName_; // depth aligned image topic
@@ -60,6 +66,7 @@ namespace triangulation{
         double depthMinValue_, depthMaxValue_;
 		int imgCols_, imgRows_;
 		Eigen::Matrix4d body2Cam_; // from body frame to camera frame
+        Eigen::Matrix4d camPoseMatrix_;
 
         // data
         // -----------------------------------------------------------------
@@ -93,6 +100,9 @@ namespace triangulation{
         std::vector<std::vector<Eigen::Vector3d>> segments_;
         std::vector<cv::Mat> mask_;
 
+        //Bounding box
+        std::vector<vertex> boundingboxes;
+
 		public:
 		triangulator();
 		triangulator(const ros::NodeHandle& nh);
@@ -116,6 +126,10 @@ namespace triangulation{
         void getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix);
         void publishDepthImage();// publish depth image
         void publishProjPoints();// publish depth cloud
+        
+        void projectObject();
+        void publishBoundingBox(); 
+        void Cam2Map(Eigen::Vector3d &position);
     };
     inline void triangulator::getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix){
         Eigen::Quaterniond quat;
@@ -132,6 +146,8 @@ namespace triangulation{
 
         camPoseMatrix = map2body * this->body2Cam_;
     }
+    
 }
+
 
 #endif

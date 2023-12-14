@@ -157,6 +157,7 @@ namespace triangulation{
         // depth image publisher
         this->depthImagePub_ = this->nh_.advertise<sensor_msgs::Image>(this->ns_ + "/depth_image", 10);
         this->depthCloudPub_ = this->nh_.advertise<sensor_msgs::PointCloud2>(this->ns_ + "/depth_cloud", 10);
+        this->boundingBoxPub_ = this->nh_.advertise<visualization_msgs::MarkerArray>(this->ns_ + "/bounding_box", 1000);
     }
 
     void triangulator::getMask(int height, int width, int channel) {
@@ -222,10 +223,16 @@ namespace triangulation{
                     if(detect) {
                         currPointCam(0) = (u - this->cx_) * depth * inv_fx;
                         currPointCam(1) = (v - this->cy_) * depth * inv_fy;
-                        currPointCam(2) = depth;
+                        currPointCam(2) = depth;                        
+			    
+		    currPointMap =
+			this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
 
-                        currPointMap =
-                                this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
+                        // currPointMap =
+                        //         this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
+
+
+                                
 
                         this->projPoints_.push_back(currPointMap);
                         this->projPointsNum_++;
@@ -304,6 +311,8 @@ namespace triangulation{
         Eigen::Quaterniond quat;
         quat = Eigen::Quaterniond(poseMsg->pose.orientation.w, poseMsg->pose.orientation.x, poseMsg->pose.orientation.y, poseMsg->pose.orientation.z);
         this->orientation_ = quat.toRotationMatrix();
+
+        getCameraPose(poseMsg, this->camPoseMatrix_);
     }
 
     void triangulator::semanticMapCB(const std_msgs::UInt16MultiArrayConstPtr& semanticMapMsg){
@@ -315,12 +324,194 @@ namespace triangulation{
     void triangulator::triangulationCB(const ros::TimerEvent& event){
         // project depth image to point cloud
         this->projectDepthImage();
+        this->projectObject();
         // publish depth image
         this->publishDepthImage();
+        this->publishBoundingBox();
     }
 
     void triangulator::registerSub(){
         // register subscribers
         this->registerCallback();
     }
+
+    void triangulator::projectObject(){  
+        this->boundingboxes.clear();
+        Eigen::Vector3d currPointCam, currPointMap;
+        std::vector<double> ObjectPointX;
+        std::vector<double> ObjectPointY;
+        std::vector<double> ObjectPointZ;
+
+        double depth;
+        double object_idx;
+        const double inv_factor = 1.0 / this->depthScale_;
+        const double inv_fx = 1.0 / this->fx_;
+        const double inv_fy = 1.0 / this->fy_;
+
+        int height = 480;
+        int width = 640;
+        int num_mask = this->semanticMap_.data.size()/height/width;
+
+        for (int i=1;i<num_mask;++i){
+            ObjectPointX.clear();
+            ObjectPointY.clear();
+            ObjectPointZ.clear();
+            int object_idx;
+
+            for (int v=0; v<this->depthImage_.rows; ++v){
+                for (int u=0; u<this->depthImage_.cols; ++u){
+
+                    depth = static_cast<double>(this->depthImage_.at<ushort>(v, u)) * inv_factor;
+                    if (depth > 0.0){
+                        if (this->mask_[i].at<ushort>(v,u) != 0){
+                        object_idx = this->mask_[i].at<ushort>(v,u);
+                        currPointCam(0) = (u - this->cx_) * depth * inv_fx;
+                        currPointCam(1) = (v - this->cy_) * depth * inv_fy;
+                        currPointCam(2) = depth;
+
+                        // currPointMap = this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
+                        // ObjectPointX.push_back(currPointMap(0));
+                        // ObjectPointY.push_back(currPointMap(1));
+                        // ObjectPointZ.push_back(currPointMap(2));
+                        
+                        ObjectPointX.push_back(currPointCam(0));
+                        ObjectPointY.push_back(currPointCam(1));
+                        ObjectPointZ.push_back(currPointCam(2));
+
+                        }
+                    }
+                }
+            }
+
+            if (ObjectPointX.size()!=0 && ObjectPointY.size()!=0 && ObjectPointZ.size()!=0){
+                vertex v;
+                v.xmax = *max_element(ObjectPointX.begin(), ObjectPointX.end());
+                v.xmin = *min_element(ObjectPointX.begin(), ObjectPointX.end());
+                v.ymax = *max_element(ObjectPointY.begin(), ObjectPointY.end());
+                v.ymin = *min_element(ObjectPointY.begin(), ObjectPointY.end());
+                v.zmax = *max_element(ObjectPointZ.begin(), ObjectPointZ.end());
+                v.zmin = *min_element(ObjectPointZ.begin(), ObjectPointZ.end());
+                v.idx = object_idx;
+                // cout<<"-----------object detected--------------------"<<endl;
+                boundingboxes.push_back(v);
+            }
+            
+        }
+
+    }
+
+
+    void triangulator::publishBoundingBox(){
+
+        if (this->boundingboxes.size()!= 0){
+            visualization_msgs::Marker line;
+            visualization_msgs::MarkerArray lines;
+            line.header.frame_id = "map";
+            line.type = visualization_msgs::Marker::LINE_LIST;
+            line.action = visualization_msgs::Marker::ADD;
+            line.ns = "box3D";  
+            line.scale.x = 0.06;
+            line.color.r = 1;
+            line.color.g = 0;
+            line.color.b = 0;
+            line.color.a = 1.0;
+            line.lifetime = ros::Duration(0.1);
+            Eigen::Vector3d vertex_pose;
+
+
+            for(size_t i = 0; i < boundingboxes.size(); i++){
+                vertex v = this->boundingboxes[i];
+                std::vector<geometry_msgs::Point> verts;
+                verts.clear();
+                geometry_msgs::Point p;
+                
+                vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmax;
+                Cam2Map(vertex_pose);
+                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
+                verts.push_back(p);
+
+                vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmax;
+                Cam2Map(vertex_pose);
+                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
+                verts.push_back(p);
+
+                vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmax;
+                Cam2Map(vertex_pose);
+                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
+                verts.push_back(p);
+
+                vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmax;
+                Cam2Map(vertex_pose);
+                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
+                verts.push_back(p);
+
+                vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmin;
+                Cam2Map(vertex_pose);
+                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
+                verts.push_back(p);
+
+                vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmin;
+                Cam2Map(vertex_pose);
+                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
+                verts.push_back(p);
+
+                vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmin;
+                Cam2Map(vertex_pose);
+                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
+                verts.push_back(p);
+
+                vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmin;
+                Cam2Map(vertex_pose);
+                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
+                verts.push_back(p);
+
+                // p.x = v.xmax; p.y = v.ymax; p.z = v.zmax;
+                // verts.push_back(p);
+                // p.x = v.xmin; p.y = v.ymax; p.z = v.zmax;
+                // verts.push_back(p);
+                // p.x = v.xmin; p.y = v.ymin; p.z = v.zmax;
+                // verts.push_back(p);
+                // p.x = v.xmax; p.y = v.ymin; p.z = v.zmax;
+                // verts.push_back(p);
+                // p.x = v.xmax; p.y = v.ymax; p.z = v.zmin;
+                // verts.push_back(p);
+                // p.x = v.xmin; p.y = v.ymax; p.z = v.zmin;
+                // verts.push_back(p);
+                // p.x = v.xmin; p.y = v.ymin; p.z = v.zmin;
+                // verts.push_back(p);
+                // p.x = v.xmax; p.y = v.ymin; p.z = v.zmin;
+                // verts.push_back(p);
+
+                int vert_idx[12][2] = {
+                    {0,1},
+                    {1,2},
+                    {2,3},
+                    {0,3},
+                    {0,4},
+                    {1,5},
+                    {3,7},
+                    {2,6},
+                    {4,5},
+                    {5,6},
+                    {4,7},
+                    {6,7}
+                };
+
+                for (size_t i=0;i<12;i++){
+                        line.points.push_back(verts[vert_idx[i][0]]);
+                        line.points.push_back(verts[vert_idx[i][1]]);
+                    }
+                    
+                    lines.markers.push_back(line);
+                    line.id++;
+            }
+            this->boundingBoxPub_.publish(lines);
+        }
+    }
+
+    void triangulator::Cam2Map(Eigen::Vector3d &position){
+        position = this->camPoseMatrix_.block<3, 3>(0, 0) * position + this->camPoseMatrix_.block<3, 1>(0, 3);
+    }
+
 }
+
