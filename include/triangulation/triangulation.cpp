@@ -97,6 +97,24 @@ namespace triangulation{
             cout << this->hint_ << ": Depth scale factor: " << this->depthScale_ << endl;
         }
 
+        // depth min value
+        if (not this->nh_.getParam(this->ns_ + "/depth_min_value", this->depthMinValue_)){
+            this->depthMinValue_ = 0.2;
+            cout << this->hint_ << ": No depth min value. Use default: 0.2 m." << endl;
+        }
+        else{
+            cout << this->hint_ << ": Depth min value: " << this->depthMinValue_ << endl;
+        }
+
+        // depth max value
+        if (not this->nh_.getParam(this->ns_ + "/depth_max_value", this->depthMaxValue_)){
+            this->depthMaxValue_ = 5.0;
+            cout << this->hint_ << ": No depth max value. Use default: 5.0 m." << endl;
+        }
+        else{
+            cout << this->hint_ << ": Depth depth max value: " << this->depthMaxValue_ << endl;
+        }
+
         // transform matrix: body to camera
         std::vector<double> body2CamVec (16);
         if (not this->nh_.getParam(this->ns_ + "/body_to_camera", body2CamVec)){
@@ -193,14 +211,26 @@ namespace triangulation{
             for (int u=0; u<this->depthImage_.cols; ++u){
                 depth = static_cast<double>(this->depthImage_.at<ushort>(v, u)) * inv_factor;
                 if (depth > 0.0){
-                    currPointCam(0) = (u - this->cx_) * depth * inv_fx;
-                    currPointCam(1) = (v - this->cy_) * depth * inv_fy;
-                    currPointCam(2) = depth;
+                    bool detect = false;
+                    int label = 0;
+                    for(int i=1;i<channel;i++){
+                        if(this->mask_[i].at<ushort>(v,u) != 0){
+                            detect = true;
+                            label = this->mask_[i].at<ushort>(v,u);
+                            break;
+                        }
+                    }
+                    if(detect) {
+                        currPointCam(0) = (u - this->cx_) * depth * inv_fx;
+                        currPointCam(1) = (v - this->cy_) * depth * inv_fy;
+                        currPointCam(2) = depth;
 
-                    currPointMap = this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
+                        currPointMap =
+                                this->body2Cam_.block<3, 3>(0, 0) * currPointCam + this->body2Cam_.block<3, 1>(0, 3);
 
-                    this->projPoints_.push_back(currPointMap);
-                    this->projPointsNum_++;
+                        this->projPoints_.push_back(currPointMap);
+                        this->projPointsNum_++;
+                    }
                 }
             }
         }

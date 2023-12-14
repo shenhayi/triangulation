@@ -63,6 +63,7 @@ namespace triangulation{
 		// CAMERA
 		double fx_, fy_, cx_, cy_; // depth camera intrinsics
 		double depthScale_; // value / depthScale
+        double depthMinValue_, depthMaxValue_;
 		int imgCols_, imgRows_;
 		Eigen::Matrix4d body2Cam_; // from body frame to camera frame
 
