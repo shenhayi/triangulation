@@ -27,6 +27,9 @@
 #include<geometry_msgs/PoseStamped.h>
 #include <algorithm>
 #include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/radius_outlier_removal.h>
+ #include <pcl/filters/passthrough.h>
+#include <pcl/common/common.h>
 #include<triangulation/utils.h>
 
 using std::cout; using std::endl;
@@ -46,6 +49,7 @@ namespace triangulation{
         std::shared_ptr<message_filters::Subscriber<std_msgs::UInt16MultiArray>> semanticMapSub_;
         //TODO: add semantic map subscriber
 		ros::Timer triangulation_Timer_;
+        ros::Timer visualization_Timer_;
         ros::Publisher depthCloudPub_;
         ros::Publisher depthImagePub_;
         ros::Publisher boundingBoxPub_;
@@ -118,6 +122,7 @@ namespace triangulation{
         void registerSub();
 
         void triangulationCB(const ros::TimerEvent& event);
+        void visualizationCB(const ros::TimerEvent& event);
 
         void depthImageCB(const sensor_msgs::ImageConstPtr& depthImageMsg);
         void depthAlignedImageCB(const sensor_msgs::ImageConstPtr& depthAlignedImageMsg);
