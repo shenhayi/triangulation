@@ -162,6 +162,7 @@ namespace triangulation{
         this->semanticMapSub_->registerCallback(boost::bind(&triangulator::semanticMapCB, this, _1));
 
         this->triangulation_Timer_ = this->nh_.createTimer(ros::Duration(0.1), &triangulator::triangulationCB, this);
+        // this->visualization_Timer_ = this->nh_.createTimer(ros::Duration(0.1), &triangulator::visualizationCB, this);
     }
 
     void triangulator::registerPub(){//TODO:
@@ -400,6 +401,11 @@ namespace triangulation{
         // publish depth image
         // this->publishDepthImage();
         this->publishBoundingBox();
+        
+    }
+
+    void triangulator::visualizationCB(const ros::TimerEvent& event){
+        this->publishBoundingBox();
     }
 
     void triangulator::registerSub(){
@@ -467,9 +473,9 @@ namespace triangulation{
                         // ObjectPointY.push_back(currPointCam(1));
                         // ObjectPointZ.push_back(currPointCam(2));
                         pcl::PointXYZ pt;
-                        pt.x = currPointCam(0);
-                        pt.y = currPointCam(1);
-                        pt.z = currPointCam(2);
+                        pt.x = currPointMap(0);
+                        pt.y = currPointMap(1);
+                        pt.z = currPointMap(2);
                         cloud->push_back(pt);
 
                         this->projPoints_.push_back(currPointMap);
@@ -482,23 +488,49 @@ namespace triangulation{
             }
 
             if (pointcounter != 0){
-                pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
-                sor.setInputCloud(cloud);
-                sor.setMeanK(50);
-                sor.setStddevMulThresh(0.2);
-                sor.filter (*cloud_filtered);
+                // pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+                // sor.setInputCloud(cloud);
+                // sor.setMeanK(50);
+                // sor.setStddevMulThresh(0.2);
+                // sor.filter (*cloud_filtered);
 
-                // cloud_filtered->width = cloud_filtered->points.size();
-                // cloud_filtered->height = 1;
-                // cloud_filtered->is_dense = true;
-                // cloud_filtered->header.frame_id = "map";
+                pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
+                outrem.setInputCloud(cloud);
+                outrem.setRadiusSearch(1.0);
+                outrem.setMinNeighborsInRadius(1200);
+                outrem.filter (*cloud_filtered);
 
+                // pcl::PassThrough<pcl::PointXYZ> pass;
+                // pass.setInputCloud (cloud);
+                // pass.setFilterFieldName ("z");
+                // pass.setFilterLimits (0.0, 6.0);
+                // pass.setFilterLimitsNegative (false);
+                // pass.filter (*cloud_filtered); 
+                
+                // pcl::PointXYZ minPt, maxPt;
+                // pcl::getMinMax3D (*cloud_filtered, minPt, maxPt);
+                // vertex v;
+                // v.xmax = maxPt.x;
+                // v.xmin = minPt.x;
+                // v.ymax = maxPt.y;
+                // v.ymin = minPt.y;
+                // v.zmax = maxPt.z;
+                // v.zmin = minPt.z;
+                // v.idx = object_idx;
+                // // cout<<"-----------object detected--------------------"<<endl;
+                // boundingboxes.push_back(v);
                 for (int i=0;i<cloud_filtered->points.size(); ++i){
                     pcl::PointXYZ pt;
                     pt = cloud_filtered->points[i];
                     ObjectPointX.push_back(pt.x);
                     ObjectPointY.push_back(pt.y);
                     ObjectPointZ.push_back(pt.z);
+                    // currPointCam(0) = pt.x;
+                    // currPointCam(1) = pt.y;
+                    // currPointCam(2) = pt.z;
+                    // currPointMap = this->camPoseMatrix_.block<3, 3>(0, 0) * currPointCam + this->camPoseMatrix_.block<3, 1>(0, 3);
+                    // this->projPoints_.push_back(currPointMap);
+                    // this->projPointsNum_++;
                 }
             }
 
@@ -514,16 +546,19 @@ namespace triangulation{
                 // cout<<"-----------object detected--------------------"<<endl;
                 boundingboxes.push_back(v);
             }
+            
         }
         this->publishProjPoints();
     }
 
 
     void triangulator::publishBoundingBox(){
-
+        visualization_msgs::Marker line;
+        visualization_msgs::MarkerArray lines;
+        // line.action =  visualization_msgs::Marker::DELETEALL;
         if (this->boundingboxes.size()!= 0){
-            visualization_msgs::Marker line;
-            visualization_msgs::MarkerArray lines;
+
+            // lines.action = visualization_msgs::DELETEALL;
             line.header.frame_id = "map";
             line.type = visualization_msgs::Marker::LINE_LIST;
             line.action = visualization_msgs::Marker::ADD;
@@ -533,7 +568,7 @@ namespace triangulation{
             line.color.g = 0;
             line.color.b = 0;
             line.color.a = 1.0;
-            line.lifetime = ros::Duration(0.1);
+            // line.lifetime = ros::Duration(1);
             Eigen::Vector3d vertex_pose;
             //add label
             visualization_msgs::Marker text;
@@ -547,6 +582,7 @@ namespace triangulation{
             text.color.g = 0;
             text.color.b = 0.8;
             text.color.a = 1.0;
+            // text.lifetime = ros::Duration(1);
 
 
             for(size_t i = 0; i < boundingboxes.size(); i++){
@@ -555,62 +591,62 @@ namespace triangulation{
                 verts.clear();
                 geometry_msgs::Point p;
                 
-                vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmax;
-                Cam2Map(vertex_pose);
-                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
-                verts.push_back(p);
-
-                vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmax;
-                Cam2Map(vertex_pose);
-                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
-                verts.push_back(p);
-
-                vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmax;
-                Cam2Map(vertex_pose);
-                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
-                verts.push_back(p);
-
-                vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmax;
-                Cam2Map(vertex_pose);
-                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
-                verts.push_back(p);
-
-                vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmin;
-                Cam2Map(vertex_pose);
-                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
-                verts.push_back(p);
-
-                vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmin;
-                Cam2Map(vertex_pose);
-                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
-                verts.push_back(p);
-
-                vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmin;
-                Cam2Map(vertex_pose);
-                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
-                verts.push_back(p);
-
-                vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmin;
-                Cam2Map(vertex_pose);
-                p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
-                verts.push_back(p);
-
-                // p.x = v.xmax; p.y = v.ymax; p.z = v.zmax;
+                // vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmax;
+                // Cam2Map(vertex_pose);
+                // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
                 // verts.push_back(p);
-                // p.x = v.xmin; p.y = v.ymax; p.z = v.zmax;
+
+                // vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmax;
+                // Cam2Map(vertex_pose);
+                // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
                 // verts.push_back(p);
-                // p.x = v.xmin; p.y = v.ymin; p.z = v.zmax;
+
+                // vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmax;
+                // Cam2Map(vertex_pose);
+                // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
                 // verts.push_back(p);
-                // p.x = v.xmax; p.y = v.ymin; p.z = v.zmax;
+
+                // vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmax;
+                // Cam2Map(vertex_pose);
+                // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
                 // verts.push_back(p);
-                // p.x = v.xmax; p.y = v.ymax; p.z = v.zmin;
+
+                // vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmin;
+                // Cam2Map(vertex_pose);
+                // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
                 // verts.push_back(p);
-                // p.x = v.xmin; p.y = v.ymax; p.z = v.zmin;
+
+                // vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmin;
+                // Cam2Map(vertex_pose);
+                // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
                 // verts.push_back(p);
-                // p.x = v.xmin; p.y = v.ymin; p.z = v.zmin;
+
+                // vertex_pose(0) = v.xmin; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmin;
+                // Cam2Map(vertex_pose);
+                // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
                 // verts.push_back(p);
-                // p.x = v.xmax; p.y = v.ymin; p.z = v.zmin;
+
+                // vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymin; vertex_pose(2) = v.zmin;
+                // Cam2Map(vertex_pose);
+                // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
                 // verts.push_back(p);
+
+                p.x = v.xmax; p.y = v.ymax; p.z = v.zmax;
+                verts.push_back(p);
+                p.x = v.xmin; p.y = v.ymax; p.z = v.zmax;
+                verts.push_back(p);
+                p.x = v.xmin; p.y = v.ymin; p.z = v.zmax;
+                verts.push_back(p);
+                p.x = v.xmax; p.y = v.ymin; p.z = v.zmax;
+                verts.push_back(p);
+                p.x = v.xmax; p.y = v.ymax; p.z = v.zmin;
+                verts.push_back(p);
+                p.x = v.xmin; p.y = v.ymax; p.z = v.zmin;
+                verts.push_back(p);
+                p.x = v.xmin; p.y = v.ymin; p.z = v.zmin;
+                verts.push_back(p);
+                p.x = v.xmax; p.y = v.ymin; p.z = v.zmin;
+                verts.push_back(p);
 
                 int vert_idx[12][2] = {
                     {0,1},
@@ -638,11 +674,14 @@ namespace triangulation{
                 //add label
                 text.id = i;
                 text.text = std::to_string(this->labels_[i]) + ":" + this->classNames_[i];
-                vertex_pose_text(0) = v.xmax; vertex_pose_text(1) = v.ymin; vertex_pose_text(2) = v.zmin;
-                Cam2Map(vertex_pose_text);
-                text.pose.position.x = vertex_pose_text(0);
-                text.pose.position.y = vertex_pose_text(1);
-                text.pose.position.z = vertex_pose_text(2);
+                // vertex_pose_text(0) = v.xmax; vertex_pose_text(1) = v.ymin; vertex_pose_text(2) = v.zmin;
+                // Cam2Map(vertex_pose_text);
+                // text.pose.position.x = vertex_pose_text(0);
+                // text.pose.position.y = vertex_pose_text(1);
+                // text.pose.position.z = vertex_pose_text(2);
+                text.pose.position.x = v.xmax;
+                text.pose.position.y = v.ymin;
+                text.pose.position.z = v.zmin;
                 lines.markers.push_back(text);
             }
             this->boundingBoxPub_.publish(lines);
