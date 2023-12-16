@@ -104,8 +104,8 @@ namespace triangulation{
         std::vector<std::vector<Eigen::Vector3d>> segments_;
         std::vector<cv::Mat> mask_;
         std::vector<int> labels_;
-        std::vector<std::string> label2name_;
-        std::vector<std::string> classNames_;
+        std::vector<std::string> label2name_; // coco.txt
+        std::vector<std::string> classNames_; // detected object class names
         std::string class_labels_path_;
 
         //Bounding box

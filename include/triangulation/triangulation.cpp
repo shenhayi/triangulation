@@ -287,7 +287,7 @@ namespace triangulation{
         for(int i=0;i<this->labels_.size();i++){
             int label = this->labels_[i];
             if(label < this->label2name_.size()) {
-                this->classNames_.push_back(this->label2name_[label]);
+                this->classNames_.push_back(this->label2name_[label - 1]);
             } else {
                 this->classNames_.push_back("Unknown");
             }
