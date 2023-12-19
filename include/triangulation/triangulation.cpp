@@ -443,6 +443,7 @@ namespace triangulation{
 
         for (int i=1;i<channel;++i){
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsampled (new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
 
             ObjectPointX.clear();
@@ -493,11 +494,15 @@ namespace triangulation{
                 // sor.setMeanK(50);
                 // sor.setStddevMulThresh(0.2);
                 // sor.filter (*cloud_filtered);
+                pcl::VoxelGrid<pcl::PointXYZ> voxelSampler;
+                voxelSampler.setInputCloud(cloud->makeShared());
+                voxelSampler.setLeafSize(0.05f, 0.05f, 0.05f);
+                voxelSampler.filter(*cloud_downsampled);
 
                 pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
-                outrem.setInputCloud(cloud);
-                outrem.setRadiusSearch(1.0);
-                outrem.setMinNeighborsInRadius(1200);
+                outrem.setInputCloud(cloud_downsampled);
+                outrem.setRadiusSearch(1.5);
+                outrem.setMinNeighborsInRadius(1000);
                 outrem.filter (*cloud_filtered);
 
                 // pcl::PassThrough<pcl::PointXYZ> pass;
@@ -543,8 +548,13 @@ namespace triangulation{
                 v.zmax = *max_element(ObjectPointZ.begin(), ObjectPointZ.end());
                 v.zmin = *min_element(ObjectPointZ.begin(), ObjectPointZ.end());
                 v.idx = object_idx;
-                // cout<<"-----------object detected--------------------"<<endl;
-                boundingboxes.push_back(v);
+                cout<<"-----------object detected---------------"<<endl;
+                if (not IsDetected(v)){
+                    cout<<"-----------is new object--------------------"<<endl;
+                    object p = GetObjectPosition(v);
+                    objectposes.push_back(p);
+                    boundingboxes.push_back(v);
+                }
             }
             
         }
@@ -568,7 +578,7 @@ namespace triangulation{
             line.color.g = 0;
             line.color.b = 0;
             line.color.a = 1.0;
-            // line.lifetime = ros::Duration(1);
+            // line.lifetime = ros::Duration(10000);
             Eigen::Vector3d vertex_pose;
             //add label
             visualization_msgs::Marker text;
@@ -582,7 +592,7 @@ namespace triangulation{
             text.color.g = 0;
             text.color.b = 0.8;
             text.color.a = 1.0;
-            // text.lifetime = ros::Duration(1);
+            // text.lifetime = ros::Duration(10000);
 
 
             for(size_t i = 0; i < boundingboxes.size(); i++){
@@ -690,6 +700,36 @@ namespace triangulation{
 
     void triangulator::Cam2Map(Eigen::Vector3d &position){
         position = this->camPoseMatrix_.block<3, 3>(0, 0) * position + this->camPoseMatrix_.block<3, 1>(0, 3);
+    }
+
+    object triangulator::GetObjectPosition(const vertex &v){
+        object o;
+        o.x = v.xmax-(v.xmax-v.xmin)/2;
+        o.y = v.ymax-(v.ymax-v.ymin)/2;
+        o.x = v.zmax-(v.zmax-v.zmin)/2;
+        o.xsize = (v.xmax-v.xmin)/2;
+        o.ysize  = (v.ymax-v.ymin)/2;
+        o.zsize = (v.zmax-v.zmin)/2;
+        return o;
+    }
+
+    bool triangulator::IsDetected(const vertex &v){
+        object v_o = GetObjectPosition(v);
+        int object_idx = 1;
+        if (objectpose.size()!=0){
+            for(object o:objectposes){
+                                // ocp.subjectTo(t,   sqrt(pow((x-pred_ob.x), 2)/pow(this->safe_dist+pred_ob.xsize/2, 2) + pow((y-pred_ob.y), 2)/pow(this->safe_dist+pred_ob.ysize/2, 2) 
+                    // 				+ pow((z-pred_ob.z), 2)/pow(this->safe_dist+pred_ob.zsize/2,2)) >= 1.0 ) ; // without probability
+
+                if((pow((v_o.x-o.x), 2)/pow(o.xsize, 2) + pow((v_o.y-o.y), 2)/pow(o.ysize, 2) 
+                                    + pow((v_o.z-o.z), 2)/pow(o.zsize,2)) <= 1.0){
+                                        return true;
+                                    }
+                object_idx+=1;
+            }
+        }
+        cout<<"----------number of detected object:"<<object_idx<<"----------"<<endl;
+        return false;
     }
 
 }
