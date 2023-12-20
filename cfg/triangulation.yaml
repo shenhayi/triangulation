@@ -10,8 +10,8 @@ seg_topic: /yolov7/yolov7_mask
 # pose_topic: /mavros/local_position/pose
 # odom_topic: /vins_estimator/imu_propagate
 
-# class_labels_path: /home/jhy/catkin_ws/src/triangulation/class_labels/coco.txt
-class_labels_path: /home/anthonyshen/ws/src/CERLAB-Autonomy/triangulation/class_labels/coco.txt
+class_labels_path: /home/jhy/catkin_ws/src/triangulation/class_labels/coco.txt
+# class_labels_path: /home/anthonyshen/ws/src/CERLAB-Autonomy/triangulation/class_labels/coco.txt
 
 # robot size
 robot_size: [0.4, 0.4, 0.1]

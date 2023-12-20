@@ -30,6 +30,7 @@
 #include <pcl/filters/radius_outlier_removal.h>
  #include <pcl/filters/passthrough.h>
 #include <pcl/common/common.h>
+#include <pcl/filters/voxel_grid.h>
 #include<triangulation/utils.h>
 
 using std::cout; using std::endl;
@@ -110,6 +111,7 @@ namespace triangulation{
 
         //Bounding box
         std::vector<vertex> boundingboxes;
+        std::vector<object> objectposes;
 
 		public:
 		triangulator();
@@ -142,6 +144,9 @@ namespace triangulation{
         void projectObject();
         void publishBoundingBox(); 
         void Cam2Map(Eigen::Vector3d &position);
+        object GetObjectPosition(const vertex &v);
+        vertex GetObjectVertex(const object &o);
+        bool IsDetected(const vertex &v);
     };
     inline void triangulator::getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix){
         Eigen::Quaterniond quat;
@@ -158,6 +163,11 @@ namespace triangulation{
 
         camPoseMatrix = map2body * this->body2Cam_;
     }
+    // inline double getDistance(pose p1, pose p2){
+
+	//     return sqrt(pow((p1.x - p2.x),2) + pow((p1.y - p2.y),2) + pow((p1.z - p2.z),2));	
+
+    // }
     
 }
 
