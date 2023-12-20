@@ -16,9 +16,16 @@ struct vertex{
 struct object{
     double x, y, z;
     double xsize, ysize, zsize;
+    double label;
     object(){
         x = 0; y= 0; z = 0;
         xsize = 0; ysize = 0; zsize = 0;
+        label = 0;
+    }
+    object(double x_, double y_, double z_, double xsize_, double ysize_, double zsize_, double label_){
+        x = x_; y= y_; z = z_;
+        xsize = xsize_; ysize = ysize_; zsize = zsize_;
+        label = label_;
     }
 };
 

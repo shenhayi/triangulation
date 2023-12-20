@@ -145,6 +145,7 @@ namespace triangulation{
         void publishBoundingBox(); 
         void Cam2Map(Eigen::Vector3d &position);
         object GetObjectPosition(const vertex &v);
+        vertex GetObjectVertex(const object &o);
         bool IsDetected(const vertex &v);
     };
     inline void triangulator::getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix){
