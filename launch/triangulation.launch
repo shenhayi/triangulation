@@ -1,4 +1,5 @@
 <launch>
+    <node pkg="rviz" type="rviz" name="triangulationRviz" args="-d $(find triangulation)/rviz/boundingbox.rviz"/>
 	<rosparam file="$(find triangulation)/cfg/triangulation.yaml" ns="/triangulation"  />
 	<node pkg="triangulation" type="triangulation_node" name="triangulation" output="screen" />
 </launch>

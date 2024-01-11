@@ -205,7 +205,7 @@ namespace triangulation{
         if(!mask_.empty()){
             this->depthImage_ = mask_[0].clone();
         }else{
-            std::cout << "Mask is empty, can't get depth image" << std::endl;
+//            std::cout << "Mask is empty, can't get depth image" << std::endl;
             this->depthImage_ = cv::Mat(480, 640, CV_16UC1, cv::Scalar(0));
         }
         // project depth image to point cloud
@@ -286,6 +286,7 @@ namespace triangulation{
         this->classNames_.clear();
         for(int i=0;i<this->labels_.size();i++){
             int label = this->labels_[i];
+            std::cout << label << " ";
             if(label < this->label2name_.size()) {
                 this->classNames_.push_back(this->label2name_[label - 1]);
             } else {
@@ -297,15 +298,10 @@ namespace triangulation{
 //        }
     }
 
-
-
     void triangulator::publishProjPoints(){
         pcl::PointXYZ pt;
         // pcl::PointCloud<pcl::PointXYZ> cloud;
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
-        // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
-
-
 
         for (int i=0; i<this->projPointsNum_; ++i){
             pt.x = this->projPoints_[i](0);
@@ -313,8 +309,6 @@ namespace triangulation{
             pt.z = this->projPoints_[i](2);
             cloud->push_back(pt);
         }
-
-       
 
         // pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
         // sor.setInputCloud(cloud);
@@ -388,7 +382,7 @@ namespace triangulation{
     void triangulator::semanticMapCB(const std_msgs::UInt16MultiArrayConstPtr& semanticMapMsg){
         // semantic map callback
         this->semanticMap_ = *semanticMapMsg;
-        std::cout << "semantic map callback" << std::endl;
+//        std::cout << "semantic map callback" << std::endl;
     }
 
     void triangulator::triangulationCB(const ros::TimerEvent& event){
@@ -400,12 +394,17 @@ namespace triangulation{
         
         // publish depth image
         // this->publishDepthImage();
-        this->publishBoundingBox();
-        
+//        this->publishBoundingBox();
+        this->getBoundingBox();
+        this->allBoxFilter();
+        this->publishAllBoundingBoxes(); //show all bounding boxes TODO: filter the bounding boxes
     }
 
     void triangulator::visualizationCB(const ros::TimerEvent& event){
-        this->publishBoundingBox();
+//        this->publishBoundingBox();
+        this->getBoundingBox();
+        this->allBoxFilter();
+        this->publishAllBoundingBoxes();
     }
 
     void triangulator::registerSub(){
@@ -423,7 +422,7 @@ namespace triangulation{
         if(!mask_.empty()){
             this->depthImage_ = mask_[0].clone();
         }else{
-            std::cout << "Mask is empty, can't get depth image" << std::endl;
+//            std::cout << "Mask is empty, can't get depth image" << std::endl;
             this->depthImage_ = cv::Mat(480, 640, CV_16UC1, cv::Scalar(0));
         }
         // project depth image to point cloud
@@ -482,7 +481,6 @@ namespace triangulation{
                         // this->projPoints_.push_back(currPointMap);
                         // this->projPointsNum_++;
                         pointcounter++;
-
                         }
                     }
                 }
@@ -492,7 +490,7 @@ namespace triangulation{
                 
                 pcl::VoxelGrid<pcl::PointXYZ> voxelSampler;
                 voxelSampler.setInputCloud(cloud->makeShared());
-                voxelSampler.setLeafSize(0.02f, 0.02f, 0.02f);
+                voxelSampler.setLeafSize(0.05f, 0.05f, 0.05f);// voxel size
                 voxelSampler.filter(*cloud_downsampled);
 
                 // pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
@@ -512,7 +510,8 @@ namespace triangulation{
                 pcl::getMinMax3D (*cloud, minPt, maxPt);
 
                 pcl::PassThrough<pcl::PointXYZ> pass;
-                pass.setInputCloud (cloud);
+//                pass.setInputCloud (cloud);
+                pass.setInputCloud (cloud_downsampled); //input the downsampled cloud
                 pass.setFilterFieldName ("z");
                 pass.setFilterLimits (minPt.z, minPt.z+2.0);
                 pass.setFilterLimitsNegative (false);
@@ -565,11 +564,38 @@ namespace triangulation{
                     boundingboxes.push_back(v);
                 }
             }
-            
         }
         this->publishProjPoints();
     }
 
+    void triangulator::getBoundingBox() {
+        if(this->boundingboxes.size()!=0){
+            for(size_t i = 0; i < boundingboxes.size(); i++) {
+                BoundingBox b = BoundingBox();
+                vertex v = this->boundingboxes[i];
+                b.v = v;
+                b.o = GetObjectPosition(v);
+                b.label = this->labels_[i];
+                bool found = false;
+                for(int j = 0; j < allBoundingBoxes.size(); j++){ // check if there is a matching bounding box
+                    object v_o = allBoundingBoxes[j].o;
+                    double dis = sqrt(pow((v_o.x-b.o.x), 2)/pow(b.o.xsize*1.5, 2) + pow((v_o.y-b.o.y), 2)/pow(b.o.ysize*1.5, 2)
+                                      + pow((v_o.z-b.o.z), 2)/pow(b.o.zsize*1.5,2));
+                    if(dis < 1.0 && b.label == allBoundingBoxes[j].label){
+                        this-> allBoundingBoxes.erase(this->allBoundingBoxes.begin()+j);
+                        j--;
+                        this-> allBoundingBoxes.push_back(b);
+                        found = true;
+                        break;  //break the loop as found a match
+                    }
+                }
+                // if no matching bounding box is found, add the current one
+                if(!found) {
+                    this-> allBoundingBoxes.push_back(b);
+                }
+            }
+        }
+    }
 
     void triangulator::publishBoundingBox(){
         visualization_msgs::Marker line;
@@ -609,7 +635,7 @@ namespace triangulation{
                 std::vector<geometry_msgs::Point> verts;
                 verts.clear();
                 geometry_msgs::Point p;
-                
+
                 // vertex_pose(0) = v.xmax; vertex_pose(1) = v.ymax; vertex_pose(2) = v.zmax;
                 // Cam2Map(vertex_pose);
                 // p.x = vertex_pose(0); p.y = vertex_pose(1); p.z = vertex_pose(2);
@@ -707,6 +733,110 @@ namespace triangulation{
         }
     }
 
+    void triangulator::publishAllBoundingBoxes() {
+        if(this->allBoundingBoxes.size()!=0) {
+            visualization_msgs::Marker line;
+            visualization_msgs::MarkerArray lines;
+            // lines.action = visualization_msgs::DELETEALL;
+            line.header.frame_id = "map";
+            line.type = visualization_msgs::Marker::LINE_LIST;
+            line.action = visualization_msgs::Marker::ADD;
+            line.ns = "box3D";
+            line.scale.x = 0.06;
+            line.color.r = 1;
+            line.color.g = 0;
+            line.color.b = 0;
+            line.color.a = 1.0;
+            // line.lifetime = ros::Duration(1);
+            Eigen::Vector3d vertex_pose;
+            //add label
+            visualization_msgs::Marker text;
+            text.header.frame_id = "map";
+            text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+            text.action = visualization_msgs::Marker::ADD;
+            Eigen::Vector3d vertex_pose_text;
+            text.ns = "label";
+            text.scale.z = 0.5;
+            text.color.r = 0;
+            text.color.g = 0;
+            text.color.b = 0.8;
+            text.color.a = 1.0;
+            // text.lifetime = ros::Duration(1);
+
+            if (this->allBoundingBoxes.size() != 0) {
+                for (size_t i = 0; i < this->allBoundingBoxes.size(); i++) {
+                    BoundingBox b = this->allBoundingBoxes[i];
+                    std::vector <geometry_msgs::Point> verts;
+                    verts.clear();
+                    geometry_msgs::Point p;
+
+                    p.x = b.v.xmax; p.y = b.v.ymax; p.z = b.v.zmax;
+                    verts.push_back(p);
+                    p.x = b.v.xmin; p.y = b.v.ymax; p.z = b.v.zmax;
+                    verts.push_back(p);
+                    p.x = b.v.xmin; p.y = b.v.ymin; p.z = b.v.zmax;
+                    verts.push_back(p);
+                    p.x = b.v.xmax; p.y = b.v.ymin; p.z = b.v.zmax;
+                    verts.push_back(p);
+                    p.x = b.v.xmax; p.y = b.v.ymax; p.z = b.v.zmin;
+                    verts.push_back(p);
+                    p.x = b.v.xmin; p.y = b.v.ymax; p.z = b.v.zmin;
+                    verts.push_back(p);
+                    p.x = b.v.xmin; p.y = b.v.ymin; p.z = b.v.zmin;
+                    verts.push_back(p);
+                    p.x = b.v.xmax; p.y = b.v.ymin; p.z = b.v.zmin;
+                    verts.push_back(p);
+
+                    int vert_idx[12][2] = {
+                            {0,1},
+                            {1,2},
+                            {2,3},
+                            {0,3},
+                            {0,4},
+                            {1,5},
+                            {3,7},
+                            {2,6},
+                            {4,5},
+                            {5,6},
+                            {4,7},
+                            {6,7}
+                    };
+
+                    for (size_t i=0;i<12;i++){
+                        line.points.push_back(verts[vert_idx[i][0]]);
+                        line.points.push_back(verts[vert_idx[i][1]]);
+                    }
+
+                    lines.markers.push_back(line);
+                    line.id++;
+
+                    text.id = i;
+                    text.text = std::to_string(b.label) + ":" + this->label2name_[b.label - 1];
+                    text.pose.position.x = b.v.xmax;
+                    text.pose.position.y = b.v.ymax;
+                    text.pose.position.z = b.v.zmax;
+                    lines.markers.push_back(text);
+                }
+                this->boundingBoxPub_.publish(lines);
+            }
+        }
+    }
+
+    void triangulator::allBoxFilter() {
+        for(int i=0; i<this->allBoundingBoxes.size();){
+            BoundingBox b = this->allBoundingBoxes[i];
+//            if(b.v.xmax-b.v.xmin < 0.5 || b.v.ymax-b.v.ymin < 0.5 || b.v.zmax-b.v.zmin < 0.5){
+//                this->allBoundingBoxes.erase(this->allBoundingBoxes.begin()+i);
+//            }
+            if(b.v.zmin > -0.3){
+                this->allBoundingBoxes.erase(this->allBoundingBoxes.begin()+i);
+            }
+            else {
+                i++;
+            }
+        }
+    }
+
     void triangulator::Cam2Map(Eigen::Vector3d &position){
         position = this->camPoseMatrix_.block<3, 3>(0, 0) * position + this->camPoseMatrix_.block<3, 1>(0, 3);
     }
@@ -736,14 +866,12 @@ namespace triangulation{
         return v;
     }
 
-
     bool triangulator::IsDetected(const vertex &v){
         object v_o = GetObjectPosition(v);
         int object_idx = 1;
         cout<<"----------number of detected object:"<<objectposes.size()<<"----------"<<endl;
         if (objectposes.size()!=0){
             for(object o:objectposes){
-
                 if(sqrt(pow((v_o.x-o.x), 2)/pow(o.xsize*1.5, 2) + pow((v_o.y-o.y), 2)/pow(o.ysize*1.5, 2) 
                                     + pow((v_o.z-o.z), 2)/pow(o.zsize*1.5,2)) <= 1.0 ){
                                         return true;
@@ -754,6 +882,5 @@ namespace triangulation{
         
         return false;
     }
-
 }
 

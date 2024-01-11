@@ -28,14 +28,20 @@
 #include <algorithm>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/radius_outlier_removal.h>
- #include <pcl/filters/passthrough.h>
+#include <pcl/filters/passthrough.h>
 #include <pcl/common/common.h>
 #include <pcl/filters/voxel_grid.h>
 #include<triangulation/utils.h>
 
 using std::cout; using std::endl;
 namespace triangulation{
-	class triangulator{
+    class BoundingBox{ // bounding box class
+    public:
+        vertex v;
+        object o;
+        int label;
+    };
+    class triangulator{
         private:
 
 	    protected:
@@ -112,6 +118,7 @@ namespace triangulation{
         //Bounding box
         std::vector<vertex> boundingboxes;
         std::vector<object> objectposes;
+        std::vector<BoundingBox> allBoundingBoxes; // all bounding boxes
 
 		public:
 		triangulator();
@@ -135,14 +142,17 @@ namespace triangulation{
         void getMask(int height, int width, int channel);
         void getLabels();
         void label2name();
-		void projectDepthImage();// project depth image to point cloud
+		void projectDepthImage(); // project depth image to point cloud
 
         void getCameraPose(const geometry_msgs::PoseStampedConstPtr& pose, Eigen::Matrix4d& camPoseMatrix);
-        void publishDepthImage();// publish depth image
-        void publishProjPoints();// publish depth cloud
+        void publishDepthImage(); // publish depth image
+        void publishProjPoints(); // publish depth cloud
         
         void projectObject();
-        void publishBoundingBox(); 
+        void getBoundingBox();
+        void publishBoundingBox();
+        void publishAllBoundingBoxes(); // publish all bounding boxes
+        void allBoxFilter(); // filter all bounding boxes
         void Cam2Map(Eigen::Vector3d &position);
         object GetObjectPosition(const vertex &v);
         vertex GetObjectVertex(const object &o);
@@ -168,7 +178,6 @@ namespace triangulation{
 	//     return sqrt(pow((p1.x - p2.x),2) + pow((p1.y - p2.y),2) + pow((p1.z - p2.z),2));	
 
     // }
-    
 }
 
 
