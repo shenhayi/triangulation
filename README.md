@@ -1,6 +1,10 @@
 # triangulation
 triangulation
 # Run Triangulation
+install triangulation,change "class_labels_path" in triangulation/cfg/triangulation.yaml
+```
+class_labels_path: PATH_TO/triangulation/class_labels/coco.txt
+```
 install target labelling
 ```
 git clone https://github.com/Zhefan-Xu/target_labelling.git
