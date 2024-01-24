@@ -253,22 +253,26 @@ namespace triangulation{
 
     void triangulator::getLabels() {
         this->labels_.clear();
-        for(int k=1;k<this->mask_.size();k++){
-            bool found = false;
-            for(int i=0;i<this->mask_[k].rows;i++){
-                for(int j=0;j<this->mask_[k].cols;j++){
-                    if(this->mask_[k].at<ushort>(i,j) != 0){
-                        this->labels_.push_back(this->mask_[k].at<ushort>(i,j));
-                        found = true;
-                        break;
-                    }
-                }
-                if(found) break;
-            }
-        }
+        // for(int k=1;k<this->mask_.size();k++){
+        //     bool found = false;
+        //     for(int i=0;i<this->mask_[k].rows;i++){
+        //         for(int j=0;j<this->mask_[k].cols;j++){
+        //             if(this->mask_[k].at<ushort>(i,j) != 0){
+        //                 this->labels_.push_back(this->mask_[k].at<ushort>(i,j));
+        //                 found = true;
+        //                 break;
+        //             }
+        //         }
+        //         if(found) break;
+        //     }
+        // }
 //        for(int i=0;i<this->labels_.size();i++){
 //            std::cout << this->labels_[i] << " ";
 //        }
+
+        for (int i = 0; i<this->allBoundingBoxes.size();++i){
+            labels_.push_back(this->allBoundingBoxes[i].v.idx);
+        }
     }
 
     void triangulator::initLabelMap() {
@@ -389,14 +393,17 @@ namespace triangulation{
         // project depth image to point cloud
         // this->projectDepthImage();
         this->projectObject();
-        this->getLabels();
-        this->label2name();
+
         
         // publish depth image
         // this->publishDepthImage();
 //        this->publishBoundingBox();
         this->getBoundingBox();
-        this->allBoxFilter();
+        this->allBoxFilter();        
+        
+        // this->getLabels();
+        // this->label2name();
+
         this->publishAllBoundingBoxes(); //show all bounding boxes TODO: filter the bounding boxes
     }
 
@@ -450,6 +457,7 @@ namespace triangulation{
             ObjectPointZ.clear();
             int object_idx;
             int pointcounter = 0;
+            int object_label;
             for (int v=1; v<this->depthImage_.rows; ++v){
                 for (int u=1; u<this->depthImage_.cols; ++u){
 
@@ -575,7 +583,8 @@ namespace triangulation{
                 vertex v = this->boundingboxes[i];
                 b.v = v;
                 b.o = GetObjectPosition(v);
-                b.label = this->labels_[i];
+                // b.label = this->labels_[i];
+                b.label = v.idx;
                 bool found = false;
                 for(int j = 0; j < allBoundingBoxes.size(); j++){ // check if there is a matching bounding box
                     object v_o = allBoundingBoxes[j].o;
@@ -708,9 +717,9 @@ namespace triangulation{
                     {6,7}
                 };
 
-                for (size_t i=0;i<12;i++){
-                        line.points.push_back(verts[vert_idx[i][0]]);
-                        line.points.push_back(verts[vert_idx[i][1]]);
+                for (size_t j=0;j<12;j++){
+                        line.points.push_back(verts[vert_idx[j][0]]);
+                        line.points.push_back(verts[vert_idx[j][1]]);
                 }
                     
                 lines.markers.push_back(line);
