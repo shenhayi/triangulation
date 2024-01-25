@@ -176,6 +176,7 @@ namespace triangulation{
         this->mask_.clear(); // first, clear the old data
 
         // create a mask for each channel
+        std::cout << "channel: " << channel << std::endl;
         for(int i=0;i<channel;i++){
             cv::Mat mask(height, width, CV_16UC1, cv::Scalar(0));
             this->mask_.push_back(mask);
