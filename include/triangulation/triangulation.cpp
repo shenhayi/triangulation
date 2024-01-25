@@ -585,22 +585,24 @@ namespace triangulation{
                 b.o = GetObjectPosition(v);
                 // b.label = this->labels_[i];
                 b.label = v.idx;
-                bool found = false;
-                for(int j = 0; j < allBoundingBoxes.size(); j++){ // check if there is a matching bounding box
-                    object v_o = allBoundingBoxes[j].o;
-                    double dis = sqrt(pow((v_o.x-b.o.x), 2)/pow(b.o.xsize*1.5, 2) + pow((v_o.y-b.o.y), 2)/pow(b.o.ysize*1.5, 2)
-                                      + pow((v_o.z-b.o.z), 2)/pow(b.o.zsize*1.5,2));
-                    if(dis < 1.0 && b.label == allBoundingBoxes[j].label){
-                        this-> allBoundingBoxes.erase(this->allBoundingBoxes.begin()+j);
-                        j--;
-                        this-> allBoundingBoxes.push_back(b);
-                        found = true;
-                        break;  //break the loop as found a match
+                if(b.label != 1) {
+                    bool found = false;
+                    for(int j = 0; j < allBoundingBoxes.size(); j++){ // check if there is a matching bounding box
+                        object v_o = allBoundingBoxes[j].o;
+                        double dis = sqrt(pow((v_o.x-b.o.x), 2)/pow(b.o.xsize*1.5, 2) + pow((v_o.y-b.o.y), 2)/pow(b.o.ysize*1.5, 2)
+                                        + pow((v_o.z-b.o.z), 2)/pow(b.o.zsize*1.5,2));
+                        if(dis < 1.0 && b.label == allBoundingBoxes[j].label){
+                            this-> allBoundingBoxes.erase(this->allBoundingBoxes.begin()+j);
+                            j--;
+                            this-> allBoundingBoxes.push_back(b);
+                            found = true;
+                            break;  //break the loop as found a match
+                        }
                     }
-                }
-                // if no matching bounding box is found, add the current one
-                if(!found) {
-                    this-> allBoundingBoxes.push_back(b);
+                    // if no matching bounding box is found, add the current one
+                    if(!found) {
+                        this-> allBoundingBoxes.push_back(b);
+                    }
                 }
             }
         }
